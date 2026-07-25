@@ -33,8 +33,7 @@ async function bootstrap() {
       scheme: 'bearer',
       bearerFormat: 'JWT',
       in: 'header',
-    },
-    'JWT-auth',
+    }
   )
   .build();
 
