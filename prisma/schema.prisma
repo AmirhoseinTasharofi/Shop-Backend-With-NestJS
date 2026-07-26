@@ -32,6 +32,30 @@ model User {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
+  addresses Address[]
+
+}
+
+// ===============================================
+// ===============Address Model===================
+model Address {
+  id             Int      @id @default(autoincrement())
+
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  province       String
+  city           String
+  streetAddress  String
+  postalCode     String
+
+  plaque         String?
+  unit           String?
+
+  isDefault      Boolean  @default(false)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
 // ===============================================
