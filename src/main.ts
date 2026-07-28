@@ -24,8 +24,8 @@ async function bootstrap() {
   //=======================Configure Swagger============================
 
   const config = new DocumentBuilder()
-  .setTitle('Scarf Shop API')
-  .setDescription('Backend API Documentation for Scarf Shop')
+  .setTitle('Shop API NestJs')
+  .setDescription('Backend API Documentation for Shop')
   .setVersion('1.0.0')
   .addBearerAuth(
     {

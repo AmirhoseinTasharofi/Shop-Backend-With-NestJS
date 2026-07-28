@@ -10,52 +10,104 @@ datasource db {
 // ===============================================
 // =================User Model====================
 
-enum UserRole {
+enum Role {
   ADMIN
   CUSTOMER
 }
 
 model User {
-  
-  id         Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  firstName  String?
-  lastName   String?
+  firstName String?
+  lastName  String?
 
-  phone      String   @unique
-  password   String
+  phone    String @unique
+  password String
 
-  role       UserRole @default(CUSTOMER)
+  role Role @default(CUSTOMER)
 
-  isActive   Boolean  @default(true)
+  isActive Boolean @default(true)
 
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   addresses Address[]
-
 }
 
 // ===============================================
 // ===============Address Model===================
 model Address {
-  id             Int      @id @default(autoincrement())
+  id Int @id @default(autoincrement())
 
-  userId         Int
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  province       String
-  city           String
-  streetAddress  String
-  postalCode     String
+  province      String
+  city          String
+  streetAddress String
+  postalCode    String
 
-  plaque         String?
-  unit           String?
+  plaque String?
+  unit   String?
 
-  isDefault      Boolean  @default(false)
+  isDefault Boolean @default(false)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
+// ===============================================
+// ===============Category Model==================
+
+model Category {
+  id Int @id @default(autoincrement())
+
+  title       String
+  slug        String  @unique
+  description String?
+
+  imageUrl String?
+
+  parentId Int?
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryHierarchy")
+
+  products Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ===============================================
+// ================Product Model==================
+
+enum ProductStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+model Product {
+  id Int @id @default(autoincrement())
+
+  title       String
+  slug        String  @unique
+  description String?
+
+  price     Decimal  @db.Decimal(10, 2)
+  salePrice Decimal? @db.Decimal(10, 2)
+
+  stock Int @default(0)
+
+  sku String @unique
+
+  categoryId Int?
+  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  status ProductStatus @default(DRAFT)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
 // ===============================================
