@@ -12,7 +12,10 @@ import { UpdateProductDto } from '../dtos/update-product.dto';
 export class AdminProductsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(body: CreateProductDto) {
+  async create(
+    body: CreateProductDto,
+    files: Express.Multer.File[],
+  ) {
     const existSlug = await this.prisma.product.findUnique({
       where: {
         slug: body.slug,
@@ -71,9 +74,9 @@ export class AdminProductsService {
         id,
       },
       include: {
-        category: true,
-      },
-    });
+          category:true,
+          images:true,
+    }});
 
     if (!product) {
       throw new NotFoundException('محصول پیدا نشد.');
