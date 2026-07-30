@@ -7,15 +7,20 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateProductDto } from '../dtos/create-product.dto';
 import { UpdateProductDto } from '../dtos/update-product.dto';
+import { UploadService } from 'src/common/upload/upload.service';
 
 @Injectable()
 export class AdminProductsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly uploadService: UploadService,
+  ) {}
 
-  async create(
-    body: CreateProductDto,
-    files: Express.Multer.File[],
-  ) {
+  async create(body: CreateProductDto, files: Express.Multer.File[]) {
+    if (!files || files.length === 0) {
+      throw new BadRequestException('حداقل یک تصویر برای محصول الزامی است.');
+    }
+
     const existSlug = await this.prisma.product.findUnique({
       where: {
         slug: body.slug,
@@ -52,8 +57,25 @@ export class AdminProductsService {
       throw new BadRequestException('قیمت تخفیف باید کمتر از قیمت اصلی باشد.');
     }
 
+    const productData = body;
+
     return this.prisma.product.create({
-      data: body,
+      data: {
+        ...productData,
+
+        images: {
+          create: files.map((file, index) => ({
+            imageUrl: `uploads/products/${file.filename}`,
+            isMain: index === 0,
+
+            sortOrder: index,
+          })),
+        },
+      },
+
+      include: {
+        images: true,
+      },
     });
   }
 
@@ -74,9 +96,10 @@ export class AdminProductsService {
         id,
       },
       include: {
-          category:true,
-          images:true,
-    }});
+        category: true,
+        images: true,
+      },
+    });
 
     if (!product) {
       throw new NotFoundException('محصول پیدا نشد.');
@@ -158,18 +181,26 @@ export class AdminProductsService {
       where: {
         id,
       },
+
+      include: {
+        images: true,
+      },
     });
-  
+
     if (!product) {
       throw new NotFoundException('محصول پیدا نشد.');
     }
-  
+
+    for (const image of product.images) {
+      await this.uploadService.deleteFile(image.imageUrl);
+    }
+
     await this.prisma.product.delete({
       where: {
         id,
       },
     });
-  
+
     return {
       message: 'محصول با موفقیت حذف شد.',
     };

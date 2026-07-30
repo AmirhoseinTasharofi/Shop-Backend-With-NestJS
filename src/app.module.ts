@@ -8,6 +8,7 @@ import { ProfileModule } from './profile/profile.module';
 import { CategoriesModule } from './categories/categories.module';
 import { ProductsModule } from './products/products.module';
 import { UploadModule } from './common/upload/upload.module';
+import { CartModule } from './cart/cart.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { UploadModule } from './common/upload/upload.module';
     CategoriesModule,
     ProductsModule,
     UploadModule,
+    CartModule,
   ],
 
   controllers: [AppController],

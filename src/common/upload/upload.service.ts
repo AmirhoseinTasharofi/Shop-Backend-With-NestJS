@@ -1,16 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { promises as fs } from 'fs';
+import { unlink } from 'fs/promises';
 import { join } from 'path';
 
 @Injectable()
 export class UploadService {
-  async deleteFile(url: string): Promise<void> {
-    try {
-      const filePath = join(process.cwd(), url.replace(/^\//, ''));
+  getFileUrl(file: Express.Multer.File): string {
+    return file.path.replace(/\\/g, '/');
+  }
 
-      await fs.unlink(filePath);
-    } catch {
-      // فایل وجود نداشت
+  async deleteFile(filePath: string) {
+    const fullPath = join(process.cwd(), filePath);
+
+    try {
+      await unlink(fullPath);
+    } catch (error) {
+      console.log('File delete error:', error.message);
     }
   }
 

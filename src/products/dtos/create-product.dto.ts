@@ -72,9 +72,4 @@ export class CreateProductDto {
   @IsEnum(ProductStatus)
   status?: ProductStatus;
 
-  @ApiPropertyOptional({
-    type: 'string',
-    format: 'binary',
-  })
-  images?: any;
 }

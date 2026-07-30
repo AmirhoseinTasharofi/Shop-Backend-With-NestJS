@@ -36,6 +36,65 @@ import { UploadFolders } from 'src/common/upload/upload.constants';
 export class AdminProductsController {
   constructor(private readonly adminProductsService: AdminProductsService) {}
 
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        title: {
+          type: 'string',
+          example: 'شال نخی زنانه',
+        },
+
+        slug: {
+          type: 'string',
+          example: 'cotton-scarf',
+        },
+
+        description: {
+          type: 'string',
+        },
+
+        price: {
+          type: 'string',
+          example: '350000',
+        },
+
+        salePrice: {
+          type: 'string',
+          example: '300000',
+        },
+
+        stock: {
+          type: 'number',
+          example: 20,
+        },
+
+        sku: {
+          type: 'string',
+          example: 'SKU-1001',
+        },
+
+        categoryId: {
+          type: 'number',
+          example: 1,
+        },
+
+        status: {
+          type: 'string',
+          example: 'ACTIVE',
+        },
+
+        images: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+      },
+    },
+  })
   @Post()
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(
@@ -43,7 +102,9 @@ export class AdminProductsController {
   )
   create(
     @Body() body: CreateProductDto,
-    @UploadedFiles() files: Express.Multer.File[],
+
+    @UploadedFiles()
+    files: Express.Multer.File[],
   ) {
     return this.adminProductsService.create(body, files);
   }
