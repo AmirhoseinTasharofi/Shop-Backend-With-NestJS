@@ -33,6 +33,7 @@ model User {
 
   addresses Address[]
   cart      Cart?
+  orders    Order[]
 }
 
 // ===============================================
@@ -165,4 +166,101 @@ model CartItem {
   updatedAt DateTime @updatedAt
 
   @@unique([cartId, productId])
+}
+
+// ===============================================
+// ===============Order Model==================
+enum OrderStatus {
+  PENDING
+  PAID
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+model Order {
+  id Int @id @default(autoincrement())
+
+  userId Int
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  receiverName  String
+  receiverPhone String
+
+  province String
+  city     String
+
+  streetAddress String
+
+  postalCode String
+
+  plaque String?
+  unit   String?
+
+  status OrderStatus @default(PENDING)
+
+  totalPrice   Decimal @db.Decimal(10, 2)
+  discount     Decimal @default(0) @db.Decimal(10, 2)
+  shippingCost Decimal @default(0) @db.Decimal(10, 2)
+  finalPrice   Decimal @db.Decimal(10, 2)
+
+  items OrderItem[]
+
+  payment Payment?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ===============================================
+// ===============OrderItem Model==================
+model OrderItem {
+  id Int @id @default(autoincrement())
+
+  orderId Int
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId Int
+
+  productTitle String
+
+  productPrice Decimal @db.Decimal(10, 2)
+
+  quantity Int
+
+  createdAt DateTime @default(now())
+}
+
+// ===============================================
+// ===============payment Model==================
+enum PaymentGateway {
+  ZARINPAL
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+model Payment {
+  id Int @id @default(autoincrement())
+
+  orderId Int   @unique
+  order   Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  amount Decimal @db.Decimal(10, 2)
+
+  gateway PaymentGateway
+
+  authority String? @unique
+
+  refId String? @unique
+
+  status PaymentStatus @default(PENDING)
+
+  paidAt DateTime?
+
+  createdAt DateTime @default(now())
 }
