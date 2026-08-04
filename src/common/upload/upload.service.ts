@@ -1,25 +1,60 @@
 import { Injectable } from '@nestjs/common';
-import { promises as fs } from 'fs';
-import { unlink } from 'fs/promises';
-import { join } from 'path';
+import { mkdir, unlink, writeFile } from 'fs/promises';
+import { join, extname } from 'path';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class UploadService {
-  getFileUrl(file: Express.Multer.File): string {
-    return file.path.replace(/\\/g, '/');
+  async saveFile(
+    file: Express.Multer.File,
+    folder: string,
+  ): Promise<string> {
+    const uploadPath = join(
+      process.cwd(),
+      'uploads',
+      folder,
+    );
+
+    await mkdir(uploadPath, {
+      recursive: true,
+    });
+
+    const fileName =
+      randomUUID() + extname(file.originalname);
+
+    const fullPath = join(
+      uploadPath,
+      fileName,
+    );
+
+    await writeFile(fullPath, file.buffer);
+
+    return `uploads/${folder}/${fileName}`.replace(
+      /\\/g,
+      '/',
+    );
   }
 
   async deleteFile(filePath: string) {
-    const fullPath = join(process.cwd(), filePath);
+    const fullPath = join(
+      process.cwd(),
+      filePath,
+    );
 
     try {
       await unlink(fullPath);
-    } catch (error) {
-      console.log('File delete error:', error.message);
+    } catch {
+      // اگر فایل وجود نداشت
     }
   }
 
-  async deleteFiles(urls: string[]): Promise<void> {
-    await Promise.all(urls.map((url) => this.deleteFile(url)));
+  async deleteFiles(urls: string[]) {
+    await Promise.all(
+      urls.map((url) => this.deleteFile(url)),
+    );
+  }
+
+  getFileUrl(path: string) {
+    return path.replace(/\\/g, '/');
   }
 }
