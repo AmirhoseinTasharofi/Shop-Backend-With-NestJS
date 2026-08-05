@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 
 @Injectable()
-export class CategoriesService {
+export class CategoryService {
   constructor(private readonly prisma: PrismaService) {}
 
   async findAll() {
