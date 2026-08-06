@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { ProductStatus } from '@prisma/client';
+import { Type } from 'class-transformer';
 import {
   IsDecimal,
   IsEnum,
@@ -49,17 +50,12 @@ export class CreateProductDto {
   @IsInt()
   @Min(0)
   stock: number;
-
-  @ApiProperty({
-    example: 'SKU-1001',
-  })
-  @IsString()
-  sku: string;
-
+  
   @ApiPropertyOptional({
     example: 1,
   })
   @IsOptional()
+  @Type(() => Number)
   @IsInt()
   @IsPositive()
   categoryId?: number;

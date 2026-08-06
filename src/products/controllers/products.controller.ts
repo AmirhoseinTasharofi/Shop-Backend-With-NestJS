@@ -4,9 +4,10 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Query,
 } from '@nestjs/common';
-
 import { ProductsService } from '../services/products.service';
+import { ProductQueryDto } from '../dtos/product-query.dto';
 
 @Controller('products')
 export class ProductsController {
@@ -14,8 +15,10 @@ export class ProductsController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
-  findAll() {
-    return this.productsService.findAll();
+  findAll(
+    @Query() query: ProductQueryDto ,
+  ) {
+    return this.productsService.findAll(query);
   }
 
   @Get(':slug')

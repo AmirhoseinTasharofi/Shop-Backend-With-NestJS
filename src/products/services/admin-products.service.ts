@@ -2,12 +2,16 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreateProductDto } from '../dtos/create-product.dto';
 import { UpdateProductDto } from '../dtos/update-product.dto';
 import { UploadService } from 'src/common/upload/upload.service';
+import { UploadFolders } from 'src/common/upload/upload.constants';
+import { Prisma } from '@prisma/client';
+import { SYSTEM_CATEGORY } from 'src/common/constants/system-category.constants';
 
 @Injectable()
 export class AdminProductsService {
@@ -16,88 +20,49 @@ export class AdminProductsService {
     private readonly uploadService: UploadService,
   ) {}
 
-  async create(body: CreateProductDto, files: Express.Multer.File[]) {
-    if (!files || files.length === 0) {
-      throw new BadRequestException('حداقل یک تصویر برای محصول الزامی است.');
-    }
-
-    const existSlug = await this.prisma.product.findUnique({
-      where: {
-        slug: body.slug,
-      },
-    });
-
-    if (existSlug) {
-      throw new ConflictException('اسلاگ قبلاً ثبت شده است.');
-    }
-
-    const existSku = await this.prisma.product.findUnique({
-      where: {
-        sku: body.sku,
-      },
-    });
-
-    if (existSku) {
-      throw new ConflictException('SKU قبلاً ثبت شده است.');
-    }
-
-    if (body.categoryId) {
-      const category = await this.prisma.category.findUnique({
-        where: {
-          id: body.categoryId,
-        },
-      });
-
-      if (!category) {
-        throw new NotFoundException('دسته‌بندی پیدا نشد.');
-      }
-    }
-
-    if (body.salePrice && Number(body.salePrice) >= Number(body.price)) {
-      throw new BadRequestException('قیمت تخفیف باید کمتر از قیمت اصلی باشد.');
-    }
-
-    const productData = body;
-
-    return this.prisma.product.create({
-      data: {
-        ...productData,
-
-        images: {
-          create: files.map((file, index) => ({
-            imageUrl: `uploads/products/${file.filename}`,
-            isMain: index === 0,
-
-            sortOrder: index,
-          })),
-        },
-      },
-
-      include: {
-        images: true,
-      },
-    });
-  }
-
-  async findAll() {
-    return this.prisma.product.findMany({
-      include: {
-        category: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-  }
-
   async findOne(id: number) {
     const product = await this.prisma.product.findUnique({
       where: {
         id,
       },
-      include: {
-        category: true,
-        images: true,
+
+      select: {
+        id: true,
+
+        title: true,
+        slug: true,
+        description: true,
+
+        price: true,
+        salePrice: true,
+
+        stock: true,
+
+        status: true,
+
+        createdAt: true,
+        updatedAt: true,
+
+        category: {
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+          },
+        },
+
+        images: {
+          select: {
+            id: true,
+            imageUrl: true,
+            alt: true,
+            isMain: true,
+            sortOrder: true,
+          },
+          orderBy: {
+            sortOrder: 'asc',
+          },
+        },
       },
     });
 
@@ -108,10 +73,116 @@ export class AdminProductsService {
     return product;
   }
 
-  async update(id: number, body: UpdateProductDto) {
+  async findAll() {
+    return this.prisma.product.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+
+      select: {
+        id: true,
+        title: true,
+        slug: true,
+        price: true,
+        salePrice: true,
+        stock: true,
+        status: true,
+        createdAt: true,
+        category: {
+          select: {
+            id: true,
+            title: true,
+          },
+        },
+
+        images: {
+          where: {
+            isMain: true,
+          },
+          select: {
+            imageUrl: true,
+          },
+          take: 1,
+        },
+      },
+    });
+  }
+
+  async create(body: CreateProductDto, files?: Express.Multer.File[]) {
+    await this.validateUniqueSlug(body.slug);
+
+    const category = await this.getCategory(body.categoryId);
+
+    this.validateSalePrice(body.price, body.salePrice);
+
+    let imageUrls: string[] = [];
+
+    try {
+      if (files?.length) {
+        imageUrls = await Promise.all(
+          files.map((file) =>
+            this.uploadService.saveFile(file, UploadFolders.PRODUCTS),
+          ),
+        );
+      }
+
+      const data: Prisma.ProductCreateInput = {
+        title: body.title,
+        slug: body.slug,
+        description: body.description,
+
+        price: body.price,
+        salePrice: body.salePrice,
+
+        stock: body.stock,
+
+        status: body.status,
+
+        category: {
+          connect: {
+            id: category.id,
+          },
+        },
+
+        images: {
+          create: imageUrls.map((url, index) => ({
+            imageUrl: url,
+            isMain: index === 0,
+            sortOrder: index,
+          })),
+        },
+      };
+
+      return await this.prisma.product.create({
+        data,
+        include: {
+          category: true,
+          images: true,
+        },
+      });
+    } catch (error) {
+      if (imageUrls.length > 0) {
+        await this.uploadService.deleteFiles(imageUrls);
+      }
+
+      throw error;
+    }
+  }
+
+  async update(
+    id: number,
+    body: UpdateProductDto,
+    files?: Express.Multer.File[],
+  ) {
+    
     const product = await this.prisma.product.findUnique({
-      where: {
-        id,
+      where: { id },
+      include: {
+        images: {
+          orderBy: {
+            sortOrder: 'asc',
+          },
+        },
       },
     });
 
@@ -120,60 +191,199 @@ export class AdminProductsService {
     }
 
     if (body.slug) {
-      const existSlug = await this.prisma.product.findFirst({
-        where: {
-          slug: body.slug,
-          NOT: {
-            id,
-          },
-        },
-      });
-
-      if (existSlug) {
-        throw new ConflictException('اسلاگ قبلاً ثبت شده است.');
-      }
+      await this.validateUniqueSlug(body.slug, id);
     }
 
-    if (body.sku) {
-      const existSku = await this.prisma.product.findFirst({
-        where: {
-          sku: body.sku,
-          NOT: {
-            id,
-          },
-        },
-      });
-
-      if (existSku) {
-        throw new ConflictException('SKU قبلاً ثبت شده است.');
-      }
-    }
-
-    if (body.categoryId) {
-      const category = await this.prisma.category.findUnique({
-        where: {
-          id: body.categoryId,
-        },
-      });
-
-      if (!category) {
-        throw new NotFoundException('دسته‌بندی پیدا نشد.');
-      }
-    }
+    const category = await this.getCategory(body.categoryId);
 
     const price = body.price ?? product.price;
     const salePrice = body.salePrice ?? product.salePrice;
+    this.validateSalePrice(price.toString(), salePrice?.toString());
 
-    if (salePrice && Number(salePrice) >= Number(price)) {
-      throw new BadRequestException('قیمت تخفیف باید کمتر از قیمت اصلی باشد.');
+    let uploadedImageUrls: string[] = [];
+
+    try {
+      if (files?.length) {
+        uploadedImageUrls = await Promise.all(
+          files.map((file) =>
+            this.uploadService.saveFile(file, UploadFolders.PRODUCTS),
+          ),
+        );
+      }
+
+      const result = await this.prisma.$transaction(async (tx) => {
+        await tx.product.update({
+          where: {
+            id,
+          },
+
+          data: {
+            title: body.title,
+            slug: body.slug,
+            description: body.description,
+
+            price: body.price,
+            salePrice: body.salePrice,
+
+            stock: body.stock,
+
+            categoryId: body.categoryId,
+
+            status: body.status,
+          },
+        });
+
+        if (body.deletedImageIds?.length) {
+          await tx.productImage.deleteMany({
+            where: {
+              id: {
+                in: body.deletedImageIds,
+              },
+
+              productId: id,
+            },
+          });
+        }
+
+        if (body.imageChanges?.length) {
+          await Promise.all(
+            body.imageChanges.map((image) =>
+              tx.productImage.update({
+                where: {
+                  id: image.id,
+                },
+
+                data: {
+                  sortOrder: image.sortOrder,
+
+                  isMain: image.isMain,
+                },
+              }),
+            ),
+          );
+        }
+
+        if (uploadedImageUrls.length) {
+          await tx.productImage.createMany({
+            data: uploadedImageUrls.map((url, index) => ({
+              productId: id,
+
+              imageUrl: url,
+
+              sortOrder: product.images.length + index,
+
+              isMain: false,
+            })),
+          });
+        }
+
+        const images = await tx.productImage.findMany({
+          where: {
+            productId: id,
+          },
+          orderBy: {
+            sortOrder: 'asc',
+          },
+        });
+
+        if (images.length > 0) {
+          const mainImages = images.filter((image) => image.isMain);
+
+          if (mainImages.length === 0) {
+            await tx.productImage.update({
+              where: {
+                id: images[0].id,
+              },
+              data: {
+                isMain: true,
+              },
+            });
+          } else if (mainImages.length > 1) {
+            await tx.productImage.updateMany({
+              where: {
+                productId: id,
+              },
+              data: {
+                isMain: false,
+              },
+            });
+
+            await tx.productImage.update({
+              where: {
+                id: mainImages[0].id,
+              },
+              data: {
+                isMain: true,
+              },
+            });
+          }
+        }
+
+        return await tx.product.findUnique({
+          where: {
+            id,
+          },
+        
+          select: {
+            id: true,
+        
+            title: true,
+            slug: true,
+            description: true,
+        
+            price: true,
+            salePrice: true,
+        
+            stock: true,
+        
+            status: true,
+        
+            createdAt: true,
+            updatedAt: true,
+        
+            category: {
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+              },
+            },
+        
+            images: {
+              select: {
+                id: true,
+                imageUrl: true,
+                alt: true,
+                isMain: true,
+                sortOrder: true,
+              },
+        
+              orderBy: {
+                sortOrder: 'asc',
+              },
+            },
+          },
+        });
+      });
+
+      if (body.deletedImageIds?.length) {
+        const deletedImages = product.images.filter((image) =>
+          body.deletedImageIds!.includes(image.id),
+        );
+
+        await this.uploadService.deleteFiles(
+          deletedImages.map((image) => image.imageUrl),
+        );
+      }
+
+      return result;
+    } catch (error) {
+      if (uploadedImageUrls.length) {
+        await this.uploadService.deleteFiles(uploadedImageUrls);
+      }
+
+      throw error;
     }
-
-    return this.prisma.product.update({
-      where: {
-        id,
-      },
-      data: body,
-    });
   }
 
   async remove(id: number) {
@@ -204,5 +414,60 @@ export class AdminProductsService {
     return {
       message: 'محصول با موفقیت حذف شد.',
     };
+  }
+
+  // ========================================================================================
+  //                                    Private Helpers
+  // ========================================================================================
+
+  private async validateUniqueSlug(slug: string, ignoreId?: number) {
+    const existSlug = await this.prisma.product.findFirst({
+      where: {
+        slug,
+        ...(ignoreId && {
+          NOT: {
+            id: ignoreId,
+          },
+        }),
+      },
+    });
+
+    if (existSlug) {
+      throw new ConflictException('اسلاگ قبلاً ثبت شده است.');
+    }
+  }
+
+  private async getCategory(categoryId?: number) {
+    let category;
+
+    if (categoryId) {
+      category = await this.prisma.category.findUnique({
+        where: {
+          id: categoryId,
+        },
+      });
+
+      if (!category) {
+        throw new NotFoundException('دسته‌بندی پیدا نشد.');
+      }
+    } else {
+      category = await this.prisma.category.findUnique({
+        where: {
+          slug: SYSTEM_CATEGORY.SLUG,
+        },
+      });
+
+      if (!category) {
+        throw new InternalServerErrorException('دسته‌بندی سیستمی پیدا نشد.');
+      }
+    }
+
+    return category;
+  }
+
+  private validateSalePrice(price: string, salePrice?: string) {
+    if (salePrice && Number(salePrice) >= Number(price)) {
+      throw new BadRequestException('قیمت تخفیف باید کمتر از قیمت اصلی باشد.');
+    }
   }
 }

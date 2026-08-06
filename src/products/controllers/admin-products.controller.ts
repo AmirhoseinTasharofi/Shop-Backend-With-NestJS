@@ -9,81 +9,54 @@ import {
   ParseIntPipe,
   Patch,
   Post,
-  UploadedFile,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiTags } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
-
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { Roles } from 'src/common/decorators/roles.decorator';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { RolesGuard } from 'src/common/guards/roles.guard';
-
+import { multerOptions } from 'src/common/upload/multer.config';
 import { AdminProductsService } from '../services/admin-products.service';
 import { CreateProductDto } from '../dtos/create-product.dto';
 import { UpdateProductDto } from '../dtos/update-product.dto';
-import { FilesInterceptor } from '@nestjs/platform-express';
-import { multerOptions } from 'src/common/upload/multer.config';
-import { UploadFolders } from 'src/common/upload/upload.constants';
 
 @ApiTags('Admin Products')
 @ApiBearerAuth('access-token')
+@Controller('admin/products')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
-@Controller('admin/products')
 export class AdminProductsController {
   constructor(private readonly adminProductsService: AdminProductsService) {}
 
+  @Get(':id')
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.adminProductsService.findOne(id);
+  }
+
+  @Get()
+  findAll() {
+    return this.adminProductsService.findAll();
+  }
+  
+  @Post()
+  @HttpCode(HttpStatus.CREATED)
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
-        title: {
-          type: 'string',
-          example: 'شال نخی زنانه',
-        },
-
-        slug: {
-          type: 'string',
-          example: 'cotton-scarf',
-        },
-
-        description: {
-          type: 'string',
-        },
-
-        price: {
-          type: 'string',
-          example: '350000',
-        },
-
-        salePrice: {
-          type: 'string',
-          example: '300000',
-        },
-
-        stock: {
-          type: 'number',
-          example: 20,
-        },
-
-        sku: {
-          type: 'string',
-          example: 'SKU-1001',
-        },
-
-        categoryId: {
-          type: 'number',
-          example: 1,
-        },
-
-        status: {
-          type: 'string',
-          example: 'ACTIVE',
-        },
+        title: { type: 'string' },
+        slug: { type: 'string' },
+        description: { type: 'string' },
+        price: { type: 'string' },
+        salePrice: { type: 'string' },
+        stock: { type: 'number' },
+        categoryId: { type: 'number' },
+        status: { type: 'string' },
 
         images: {
           type: 'array',
@@ -95,39 +68,59 @@ export class AdminProductsController {
       },
     },
   })
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(
-    FilesInterceptor('images', 10, multerOptions(UploadFolders.PRODUCTS)),
-  )
+  @UseInterceptors(FilesInterceptor('images', 20, multerOptions()))
   create(
     @Body() body: CreateProductDto,
-
-    @UploadedFiles()
-    files: Express.Multer.File[],
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
     return this.adminProductsService.create(body, files);
   }
 
-  @Get()
-  @HttpCode(HttpStatus.OK)
-  findAll() {
-    return this.adminProductsService.findAll();
-  }
-
-  @Get(':id')
-  @HttpCode(HttpStatus.OK)
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.adminProductsService.findOne(id);
-  }
-
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+
+      properties: {
+        title: { type: 'string' },
+        slug: { type: 'string' },
+        description: { type: 'string' },
+        price: { type: 'string' },
+        salePrice: { type: 'string' },
+        stock: { type: 'number' },
+        categoryId: { type: 'number' },
+        status: { type: 'string' },
+
+        deletedImageIds: {
+          type: 'string',
+          example: '[3,5]',
+        },
+
+        imageChanges: {
+          type: 'string',
+          example: '[{"id":2,"sortOrder":0,"isMain":true}]',
+        },
+
+        newImages: {
+          type: 'array',
+          items: {
+            type: 'string',
+            format: 'binary',
+          },
+        },
+      },
+    },
+  })
+  @UseInterceptors(FilesInterceptor('newImages', 20, multerOptions()))
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: UpdateProductDto,
+    @UploadedFiles() files: Express.Multer.File[],
   ) {
-    return this.adminProductsService.update(id, body);
+    
+    return this.adminProductsService.update(id, body, files);
   }
 
   @Delete(':id')
