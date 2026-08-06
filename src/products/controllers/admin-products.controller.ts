@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -23,6 +24,7 @@ import { multerOptions } from 'src/common/upload/multer.config';
 import { AdminProductsService } from '../services/admin-products.service';
 import { CreateProductDto } from '../dtos/create-product.dto';
 import { UpdateProductDto } from '../dtos/update-product.dto';
+import { AdminProductQueryDto } from '../dtos/admin-product-query.dto';
 
 @ApiTags('Admin Products')
 @ApiBearerAuth('access-token')
@@ -38,8 +40,10 @@ export class AdminProductsController {
   }
 
   @Get()
-  findAll() {
-    return this.adminProductsService.findAll();
+  findAll(
+    @Query() query: AdminProductQueryDto,
+  ) {
+    return this.adminProductsService.findAll(query);
   }
   
   @Post()

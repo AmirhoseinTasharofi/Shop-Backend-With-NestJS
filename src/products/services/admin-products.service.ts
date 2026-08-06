@@ -12,6 +12,7 @@ import { UploadService } from 'src/common/upload/upload.service';
 import { UploadFolders } from 'src/common/upload/upload.constants';
 import { Prisma } from '@prisma/client';
 import { SYSTEM_CATEGORY } from 'src/common/constants/system-category.constants';
+import { AdminProductQueryDto, AdminProductSort } from '../dtos/admin-product-query.dto';
 
 @Injectable()
 export class AdminProductsService {
@@ -73,39 +74,135 @@ export class AdminProductsService {
     return product;
   }
 
-  async findAll() {
-    return this.prisma.product.findMany({
-      orderBy: {
-        createdAt: 'desc',
-      },
-
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        price: true,
-        salePrice: true,
-        stock: true,
-        status: true,
-        createdAt: true,
-        category: {
+  async findAll(query: AdminProductQueryDto) {
+    const {
+      page,
+      limit,
+      search,
+      categoryId,
+      status,
+      sort,
+    } = query;
+  
+    const skip = (page - 1) * limit;
+  
+    const where: Prisma.ProductWhereInput = {};
+  
+    if (status) {
+      where.status = status;
+    }
+  
+    if (categoryId) {
+      where.categoryId = categoryId;
+    }
+  
+    if (search) {
+      where.OR = [
+        {
+          title: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+        {
+          slug: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      ];
+    }
+  
+    const orderBy: Prisma.ProductOrderByWithRelationInput = {};
+  
+    switch (sort) {
+      case AdminProductSort.NEWEST:
+        orderBy.createdAt = 'desc';
+        break;
+  
+      case AdminProductSort.OLDEST:
+        orderBy.createdAt = 'asc';
+        break;
+  
+      case AdminProductSort.PRICE_ASC:
+        orderBy.price = 'asc';
+        break;
+  
+      case AdminProductSort.PRICE_DESC:
+        orderBy.price = 'desc';
+        break;
+  
+      case AdminProductSort.STOCK_ASC:
+        orderBy.stock = 'asc';
+        break;
+  
+      case AdminProductSort.STOCK_DESC:
+        orderBy.stock = 'desc';
+        break;
+    }
+  
+    const [products, total] =
+      await this.prisma.$transaction([
+        this.prisma.product.findMany({
+          where,
+  
+          skip,
+          take: limit,
+  
+          orderBy,
+  
           select: {
             id: true,
             title: true,
+            slug: true,
+            price: true,
+            salePrice: true,
+            stock: true,
+            status: true,
+            createdAt: true,
+  
+            category: {
+              select: {
+                id: true,
+                title: true,
+              },
+            },
+  
+            images: {
+              where: {
+                isMain: true,
+              },
+              select: {
+                imageUrl: true,
+              },
+              take: 1,
+            },
           },
-        },
-
-        images: {
-          where: {
-            isMain: true,
-          },
-          select: {
-            imageUrl: true,
-          },
-          take: 1,
-        },
+        }),
+  
+        this.prisma.product.count({
+          where,
+        }),
+      ]);
+  
+    return {
+      data: products.map((product) => ({
+        ...product,
+        mainImage:
+          product.images[0]?.imageUrl ?? null,
+        images: undefined,
+      })),
+  
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+        hasNext:
+          page < Math.ceil(total / limit),
+        hasPrev: page > 1,
       },
-    });
+    };
   }
 
   async create(body: CreateProductDto, files?: Express.Multer.File[]) {
