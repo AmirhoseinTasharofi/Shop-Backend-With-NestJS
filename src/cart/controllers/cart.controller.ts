@@ -37,7 +37,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
     getCart(
       @CurrentUser() user: JwtPayload,
     ) {
-      return this.cartService.getCart(user.sub);
+      return this.cartService.get(user.sub);
     }
   
     @Post()
@@ -46,7 +46,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
       @CurrentUser() user: JwtPayload,
       @Body() body: AddToCartDto,
     ) {
-      return this.cartService.addToCart(user.sub, body);
+      return this.cartService.add(user.sub, body);
     }
   
     @Patch(':productId')
@@ -56,7 +56,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
       @Param('productId', ParseIntPipe) productId: number,
       @Body() body: UpdateCartItemDto,
     ) {
-      return this.cartService.updateQuantity(
+      return this.cartService.update(
         user.sub,
         productId,
         body,
@@ -69,7 +69,7 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
       @CurrentUser() user: JwtPayload,
       @Param('productId', ParseIntPipe) productId: number,
     ) {
-      return this.cartService.removeFromCart(
+      return this.cartService.remove(
         user.sub,
         productId,
       );
@@ -80,6 +80,6 @@ import { RolesGuard } from 'src/common/guards/roles.guard';
     clearCart(
       @CurrentUser() user: JwtPayload,
     ) {
-      return this.cartService.clearCart(user.sub);
+      return this.cartService.clear(user.sub);
     }
   }

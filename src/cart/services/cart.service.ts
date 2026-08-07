@@ -1,186 +1,219 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException,
-  } from '@nestjs/common';
-  import { PrismaService } from 'src/prisma/prisma.service';
-  import { AddToCartDto } from '../dtos/add-to-cart.dto';
-  import { UpdateCartItemDto } from '../dtos/update-cart-item.dto';
-  
-  @Injectable()
-  export class CartService {
-    constructor(private readonly prisma: PrismaService) {}
-  
-    async getCart(userId: number) {
-      return this.prisma.cart.findUnique({
-        where: { userId },
-        include: {
-          items: {
-            include: {
-              product: {
-                include: {
-                  images: {
-                    orderBy: {
-                      sortOrder: 'asc',
-                    },
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { AddToCartDto } from '../dtos/add-to-cart.dto';
+import { UpdateCartItemDto } from '../dtos/update-cart-item.dto';
+import { Prisma } from '@prisma/client';
+import { ProductsService } from 'src/products/services/products.service';
+
+@Injectable()
+export class CartService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly productService: ProductsService,
+  ) {}
+
+  async create(userId: number, tx: Prisma.TransactionClient = this.prisma) {
+    return tx.cart.create({
+      data: {
+        userId,
+      },
+    });
+  }
+
+  async get(userId: number) {
+    const cart = await this.prisma.cart.findUnique({
+      where: {
+        userId,
+      },
+
+      select: {
+        id: true,
+
+        items: {
+          select: {
+            quantity: true,
+
+            product: {
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+
+                price: true,
+                salePrice: true,
+
+                stock: true,
+
+                images: {
+                  where: {
+                    isMain: true,
                   },
+
+                  select: {
+                    imageUrl: true,
+                  },
+
+                  take: 1,
                 },
               },
             },
           },
         },
-      });
+      },
+    });
+
+    if (!cart) {
+      throw new NotFoundException('سبد خرید پیدا نشد.');
     }
-  
-    async addToCart(userId: number, dto: AddToCartDto) {
-      const product = await this.prisma.product.findFirst({
-        where: {
-          id: dto.productId,
-          status: 'ACTIVE',
-        },
-      });
-  
-      if (!product) {
-        throw new NotFoundException('محصول پیدا نشد.');
-      }
-  
-      if (product.stock === 0) {
-        throw new BadRequestException('محصول ناموجود است.');
-      }
-  
-      if (dto.quantity > product.stock) {
-        throw new BadRequestException('تعداد درخواستی بیشتر از موجودی است.');
-      }
-  
-      let cart = await this.prisma.cart.findUnique({
-        where: {
-          userId,
-        },
-      });
-  
-      if (!cart) {
-        cart = await this.prisma.cart.create({
-          data: {
-            userId,
-          },
-        });
-      }
-  
-      const cartItem = await this.prisma.cartItem.findUnique({
-        where: {
-          cartId_productId: {
-            cartId: cart.id,
-            productId: dto.productId,
-          },
-        },
-      });
-  
-      if (cartItem) {
-        const quantity = cartItem.quantity + dto.quantity;
-  
-        if (quantity > product.stock) {
-          throw new BadRequestException(
-            'تعداد درخواستی بیشتر از موجودی است.',
-          );
-        }
-  
-        return this.prisma.cartItem.update({
-          where: {
-            id: cartItem.id,
-          },
-          data: {
-            quantity,
-          },
-        });
-      }
-  
-      return this.prisma.cartItem.create({
-        data: {
-          cartId: cart.id,
-          productId: dto.productId,
-          quantity: dto.quantity,
-        },
-      });
-    }
-  
-    async updateQuantity(
-      userId: number,
-      productId: number,
-      dto: UpdateCartItemDto,
-    ) {
-      const cart = await this.prisma.cart.findUnique({
-        where: { userId },
-      });
-  
-      if (!cart) {
-        throw new NotFoundException('سبد خرید پیدا نشد.');
-      }
-  
-      const product = await this.prisma.product.findUnique({
-        where: { id: productId },
-      });
-  
-      if (!product) {
-        throw new NotFoundException('محصول پیدا نشد.');
-      }
-  
-      if (dto.quantity > product.stock) {
-        throw new BadRequestException('تعداد بیشتر از موجودی است.');
-      }
-  
-      return this.prisma.cartItem.update({
-        where: {
-          cartId_productId: {
-            cartId: cart.id,
-            productId,
-          },
-        },
-        data: {
-          quantity: dto.quantity,
-        },
-      });
-    }
-  
-    async removeFromCart(userId: number, productId: number) {
-      const cart = await this.prisma.cart.findUnique({
-        where: { userId },
-      });
-  
-      if (!cart) {
-        throw new NotFoundException('سبد خرید پیدا نشد.');
-      }
-  
-      await this.prisma.cartItem.delete({
-        where: {
-          cartId_productId: {
-            cartId: cart.id,
-            productId,
-          },
-        },
-      });
-  
-      return {
-        message: 'محصول از سبد حذف شد.',
-      };
-    }
-  
-    async clearCart(userId: number) {
-      const cart = await this.prisma.cart.findUnique({
-        where: { userId },
-      });
-  
-      if (!cart) {
-        throw new NotFoundException('سبد خرید پیدا نشد.');
-      }
-  
-      await this.prisma.cartItem.deleteMany({
-        where: {
-          cartId: cart.id,
-        },
-      });
-  
-      return {
-        message: 'سبد خرید خالی شد.',
-      };
-    }
+
+    return {
+      id: cart.id,
+
+      items: cart.items.map((item) => ({
+        productId: item.product.id,
+
+        title: item.product.title,
+        slug: item.product.slug,
+
+        price: item.product.price,
+        salePrice: item.product.salePrice,
+
+        stock: item.product.stock,
+
+        quantity: item.quantity,
+
+        mainImage: item.product.images[0]?.imageUrl ?? null,
+      })),
+    };
   }
+
+  async add(userId: number, dto: AddToCartDto) {
+    const product = await this.productService.getAvailableProduct(
+      dto.productId,
+    );
+
+    this.productService.validateStock(product.stock, dto.quantity);
+
+    const cart = await this.getCartOrThrow(userId);
+
+    const cartItem = await this.getCartItem(cart.id, dto.productId);
+
+    if (cartItem) {
+      const newQuantity = cartItem.quantity + dto.quantity;
+
+      this.productService.validateStock(product.stock, newQuantity);
+
+      return this.updateCartItem(cartItem.id, newQuantity);
+    }
+
+    return this.createCartItem(cart.id, dto.productId, dto.quantity);
+  }
+
+  async update(userId: number, productId: number, dto: UpdateCartItemDto) {
+    const cart = await this.getCartOrThrow(userId);
+
+    const product = await this.productService.getAvailableProduct(productId);
+
+    this.productService.validateStock(product.stock, dto.quantity);
+
+    const cartItem = await this.getCartItem(cart.id, productId);
+
+    if (!cartItem) {
+      throw new NotFoundException('محصول در سبد خرید پیدا نشد.');
+    }
+
+    return this.updateCartItem(cartItem.id, dto.quantity);
+  }
+
+  async remove(userId: number, productId: number) {
+    const cart = await this.getCartOrThrow(userId);
+
+    const cartItem = await this.getCartItem(cart.id, productId);
+
+    if (!cartItem) {
+      throw new NotFoundException('محصول در سبد خرید پیدا نشد.');
+    }
+
+    await this.prisma.cartItem.delete({
+      where: {
+        id: cartItem.id,
+      },
+    });
+
+    return {
+      message: 'محصول از سبد حذف شد.',
+    };
+  }
+
+  async clear(userId: number) {
+    const cart = await this.getCartOrThrow(userId);
+
+    await this.prisma.cartItem.deleteMany({
+      where: {
+        cartId: cart.id,
+      },
+    });
+
+    return {
+      message: 'سبد خرید خالی شد.',
+    };
+  }
+
+  // ========================================================================================
+  //                                    Private Helpers
+  // ========================================================================================
+
+  private async getCartOrThrow(userId: number) {
+    const cart = await this.prisma.cart.findUnique({
+      where: {
+        userId,
+      },
+    });
+
+    if (!cart) {
+      throw new NotFoundException('سبد خرید پیدا نشد.');
+    }
+
+    return cart;
+  }
+
+  private async getCartItem(cartId: number, productId: number) {
+    return this.prisma.cartItem.findUnique({
+      where: {
+        cartId_productId: {
+          cartId,
+          productId,
+        },
+      },
+    });
+  }
+
+  private async createCartItem(
+    cartId: number,
+    productId: number,
+    quantity: number,
+  ) {
+    return this.prisma.cartItem.create({
+      data: {
+        cartId,
+        productId,
+        quantity,
+      },
+    });
+  }
+
+  private async updateCartItem(id: number, quantity: number) {
+    return this.prisma.cartItem.update({
+      where: {
+        id,
+      },
+      data: {
+        quantity,
+      },
+    });
+  }
+}
