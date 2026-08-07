@@ -13,15 +13,27 @@ export class UserService {
 
   async create(body: CreateUserDto) {
     const exists = await this.findByPhone(body.phone);
-
+  
     if (exists) {
-      throw new ConflictException('این شماره موبایل قبلا ثبت شده است');
+      throw new ConflictException(
+        'این شماره موبایل قبلا ثبت شده است',
+      );
     }
-
-    return this.prisma.user.create({
-      data: {
-        phone: body.phone,
-      },
+  
+    return this.prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
+        data: {
+          phone: body.phone,
+        },
+      });
+  
+      await tx.cart.create({
+        data: {
+          userId: user.id,
+        },
+      });
+  
+      return user;
     });
   }
 
