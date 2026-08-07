@@ -6,10 +6,15 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { UpdateUserDto } from '../dtos/update-user.dto';
 import { CreateUserDto } from '../dtos/create-user-dto';
+import { CartService } from 'src/cart/services/cart.service';
+import { Role } from '@prisma/client';
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cartService : CartService,
+  ) {}
 
   async create(body: CreateUserDto) {
     const exists = await this.findByPhone(body.phone);
@@ -27,12 +32,9 @@ export class UserService {
         },
       });
   
-      await tx.cart.create({
-        data: {
-          userId: user.id,
-        },
-      });
-  
+      if (user.role === Role.CUSTOMER) {
+        await this.cartService.create(user.id , tx);
+      }  
       return user;
     });
   }
