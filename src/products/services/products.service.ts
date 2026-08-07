@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ProductStatus, Prisma } from '@prisma/client';
@@ -214,5 +218,41 @@ export class ProductsService {
     }
 
     return product;
+  }
+
+  
+  // ========================================================================================
+  //                                    Private Helpers
+  // ========================================================================================
+
+  async getAvailableProduct(id: number) {
+    const product = await this.prisma.product.findFirst({
+      where: {
+        id,
+        status: ProductStatus.ACTIVE,
+      },
+
+      select: {
+        id: true,
+        stock: true,
+        status: true,
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('محصول پیدا نشد.');
+    }
+
+    return product;
+  }
+
+  validateStock(stock: number, quantity: number) {
+    if (stock === 0) {
+      throw new BadRequestException('محصول ناموجود است.');
+    }
+
+    if (quantity > stock) {
+      throw new BadRequestException('تعداد درخواستی بیشتر از موجودی است.');
+    }
   }
 }
