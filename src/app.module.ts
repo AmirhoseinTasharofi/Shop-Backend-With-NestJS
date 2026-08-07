@@ -4,12 +4,13 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { ConfigModule } from '@nestjs/config';
-import { ProfileModule } from './profile/profile.module';
-import { CategoriesModule } from './categories/categories.module';
+import { UserModule } from './user/user.module';
+import { CategoryModule } from './category/category.module';
 import { ProductsModule } from './products/products.module';
 import { UploadModule } from './common/upload/upload.module';
 import { CartModule } from './cart/cart.module';
 import { OrdersModule } from './orders/orders.module';
+import { AddressModule } from './address/address.module';
 
 @Module({
   imports: [
@@ -18,12 +19,13 @@ import { OrdersModule } from './orders/orders.module';
     }),
     AuthModule,
     PrismaModule,
-    ProfileModule,
-    CategoriesModule,
+    UserModule,
+    CategoryModule,
     ProductsModule,
     UploadModule,
     CartModule,
     OrdersModule,
+    AddressModule,
   ],
 
   controllers: [AppController],

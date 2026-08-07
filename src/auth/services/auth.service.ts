@@ -38,10 +38,10 @@ export class AuthService {
   async verifyOtp(body: VerifyOtpDto, response: Response) {
     await this.otpService.verify(body.phone, body.code);
 
-    let user = await this.userService.findUserByPhone(body.phone);
+    let user = await this.userService.findByPhone(body.phone);
 
     if (!user) {
-      user = await this.userService.createUser({ phone: body.phone });
+      user = await this.userService.create({ phone: body.phone });
     }
 
     const tokens = await this.issueTokens(user);
@@ -100,6 +100,10 @@ export class AuthService {
     });
   }
 
+  // ========================================================================================
+  //                                    Private Helpers
+  // ========================================================================================
+
   private async validateRefreshToken(refreshToken: string) {
     let payload: JwtPayload;
 
@@ -116,7 +120,7 @@ export class AuthService {
       refreshToken,
     );
 
-    const user = await this.userService.findUserById(payload.sub);
+    const user = await this.userService.findById(payload.sub);
 
     return {
       user,
@@ -188,60 +192,3 @@ export class AuthService {
     );
   }
 }
-
-// async register(body: RegisterDto) {
-//   const existUser = await this.prismaService.user.findUnique({
-//     where: {
-//       phone: body.phone,
-//     },
-//   });
-//   if (existUser) {
-//     throw new ConflictException('این شماره موبایل قبلا ثبت شده است');
-//   }
-
-//   const hashedPassword = await this.passwordService.hash(body.password);
-
-//   const user = await this.prismaService.user.create({
-//     data: {
-//       phone: body.phone,
-//       password: hashedPassword,
-//     },
-//     select: {
-//       id: true,
-//       phone: true,
-//       createdAt: true,
-//     },
-//   });
-
-//   return {
-//     massage: 'ثبت نام با موفقیت انجام شد',
-//     user,
-//   };
-// }
-
-// async login(body: LoginDto) {
-//   const user = await this.prismaService.user.findUnique({
-//     where: {
-//       phone: body.phone,
-//     },
-//   });
-
-//   if (!user) {
-//     throw new UnauthorizedException('شماره موبایل یا رمز عبور اشتباه است.');
-//   }
-
-//   const isPasswordCorrect = await this.passwordService.compare(
-//     body.password,
-//     user.password,
-//   );
-
-//   if (!isPasswordCorrect) {
-//     throw new UnauthorizedException('شماره موبایل یا رمز عبور اشتباه است.');
-//   }
-
-//   const accessToken = this.generateAccessToken(user);
-
-//   return {
-//     accessToken,
-//   };
-// }

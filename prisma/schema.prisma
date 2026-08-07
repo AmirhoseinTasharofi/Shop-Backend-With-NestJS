@@ -8,6 +8,38 @@ datasource db {
 }
 
 // ===============================================
+// =================Auth Model====================
+
+model Otp {
+
+  id Int @id @default(autoincrement())
+
+  phone String @unique
+
+  codeHash String
+
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+}
+
+model RefreshToken {
+
+  id Int @id @default(autoincrement())
+
+  userId Int
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tokenHash String
+
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+}
+// ===============================================
 // =================User Model====================
 
 enum Role {
@@ -21,16 +53,16 @@ model User {
   firstName String?
   lastName  String?
 
-  phone    String @unique
-  password String
+  phone     String   @unique
 
-  role Role @default(CUSTOMER)
+  role      Role     @default(CUSTOMER)
 
-  isActive Boolean @default(true)
+  isActive  Boolean  @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  refreshTokens RefreshToken[]
   addresses Address[]
   cart      Cart?
   orders    Order[]
@@ -72,6 +104,8 @@ model Category {
 
   parentId Int?
 
+  isSystem Boolean @default(false)
+
   parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
   children Category[] @relation("CategoryHierarchy")
 
@@ -102,14 +136,12 @@ model Product {
 
   stock Int @default(0)
 
-  sku String @unique
-
   images    ProductImage[]
   cartItems CartItem[]
 
-  categoryId Int?
-  category   Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-
+  categoryId Int
+  category Category @relation(fields: [categoryId],references: [id],onUpdate: Cascade) 
+ 
   status ProductStatus @default(DRAFT)
 
   createdAt DateTime @default(now())
